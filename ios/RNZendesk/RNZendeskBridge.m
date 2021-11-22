@@ -14,6 +14,7 @@
 // MARK: - Initialization
 
 RCT_EXTERN_METHOD(initialize:(NSDictionary *)config);
+RCT_EXTERN_METHOD(registerPushToken:(NSString *)token);
 
 // MARK: - Indentification
 

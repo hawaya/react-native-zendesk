@@ -8,7 +8,8 @@
 
 import UIKit
 import Foundation
-import ZendeskSDK
+import SupportSDK
+import SupportProvidersSDK
 import ZendeskCoreSDK
 import CommonUISDK
 
@@ -42,7 +43,20 @@ class RNZendesk: RCTEventEmitter {
         Zendesk.initialize(appId: appId, clientId: clientId, zendeskUrl: zendeskUrl)
         Support.initialize(withZendesk: Zendesk.instance)
     }
-    
+            
+    @objc(registerPushToken:)
+    func registerPushToken(token: String?) {
+        guard let token = token else { return }
+        let locale = NSLocale.preferredLanguages.first ?? "en"
+        ZDKPushProvider(zendesk: (Zendesk.instance)!).register(deviceIdentifier: token, locale: locale) { (pushResponse, error) in
+            if ((error) != nil) {
+            print("Couldn't register device: \(token). Error: \(error)")
+        } else {
+            print("Successfully registered device: \(token)")
+          }
+        }
+    }
+
     // MARK: - Indentification
     
     @objc(identifyJWT:)
@@ -64,7 +78,13 @@ class RNZendesk: RCTEventEmitter {
     func showHelpCenter(with options: [String: Any]) {
         DispatchQueue.main.async {
             let hcConfig = HelpCenterUiConfiguration()
-            hcConfig.hideContactSupport = (options["hideContactSupport"] as? Bool) ?? false
+
+            if let hideContactSupport = options["hideContactSupport"] as? Bool {
+                hcConfig.showContactOptions = !hideContactSupport
+            } else {
+                hcConfig.showContactOptions = true
+            }
+
             let helpCenter = HelpCenterUi.buildHelpCenterOverviewUi(withConfigs: [hcConfig])
             
             let nvc = UINavigationController(rootViewController: helpCenter)
@@ -78,7 +98,17 @@ class RNZendesk: RCTEventEmitter {
             let config = RequestUiConfiguration()
             if let tags = options["tags"] as? [String] {
                 config.tags = tags
+            }          
+            var customList: [CustomField] = [];
+            if let customFields = options["custom_fields"] as? [Any] {
+                for item in customFields {
+                    let result = item as! NSDictionary
+                    
+                    let customField = CustomField(fieldId: Int64(truncating: result["fieldId"] as! NSNumber), value: result["value"])
+                    customList.append(customField)
+                }
             }
+            config.customFields = customList
             let requestScreen = RequestUi.buildRequestUi(with: [config])
             
             let nvc = UINavigationController(rootViewController: requestScreen)
@@ -90,7 +120,7 @@ class RNZendesk: RCTEventEmitter {
     func showTicketList() {
         DispatchQueue.main.async {
             let requestListController = RequestUi.buildRequestList()
-            
+
             let nvc = UINavigationController(rootViewController: requestListController)
             UIApplication.shared.keyWindow?.rootViewController?.present(nvc, animated: true)
         }
